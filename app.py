@@ -1,60 +1,100 @@
-# Step 2: Create the Streamlit app (app.py)
-%%writefile app.py
 import streamlit as st
 import pandas as pd
+import numpy as np
 
-# Load data (Assuming processed CSV files for events, products, and users)
-events_df = pd.read_csv('/content/drive/MyDrive/10192_10189act6/processed_amazon_events_data.csv')
-products_df = pd.read_csv('/content/drive/MyDrive/10192_10189act6/processed_amazon_products_data.csv')
-users_df = pd.read_csv('/content/drive/MyDrive/10192_10189act6/processed_amazon_users_data.csv')
+# Page configuration
+st.set_page_config(
+    page_title="AmazonX: Next-Gen Recommendation Engine",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
-# Display column names for debugging
-st.write("Users DataFrame Columns:", users_df.columns)
+# Load Data
+@st.cache_data
+def load_data():
+    events_df = pd.read_csv('processed_amazon_events_data.csv')
+    products_df = pd.read_csv('processed_amazon_products_data.csv')
+    users_df = pd.read_csv('processed_amazon_users_data.csv')
+    return events_df, products_df, users_df
 
-# Dropdown for selecting user
-user_id = st.selectbox("Select User ID", users_df['user_id'])
+events_df, products_df, users_df = load_data()
 
-# Get user data
-user_data = users_df.loc[users_df['user_id'] == user_id].iloc[0]
+# Sidebar: User Selection
+st.sidebar.title("User Selection")
+user_id = st.sidebar.selectbox("Choose User ID", users_df['user_id'])
 
-# Display user demographics with a check for missing columns
-st.write(f"**Age:** {user_data['age']}")
-st.write(f"**Gender:** {user_data['gender']}")
-st.write(f"**Prime Member:** {'Yes' if user_data['is_prime_member'] else 'No'}")
+# Main Dashboard
+st.title("AmazonX: Next-Gen Recommendation Engine")
+st.markdown(
+    """
+    Welcome to AmazonX's Recommendation Dashboard!  
+    Explore dynamic insights and personalized recommendations tailored to customer behavior.
+    """
+)
 
-# Safely retrieve 'preferred_platform' if it exists, otherwise display 'Not Available'
-preferred_platform = user_data.get('preferred_platform', 'Not Available')
-st.write(f"**Preferred Platform:** {preferred_platform}")
+# 1. Recommendations Based on Browsing History
+st.header("Recommendations Based on Browsing History")
+def recommend_based_on_browsing(user_id):
+    browsed_categories = events_df[events_df['user_id'] == user_id]['category'].value_counts().head(3).index
+    recommendations = products_df[products_df['category'].isin(browsed_categories)].sample(5)
+    return recommendations[['product_name', 'category', 'base_price', 'rating']]
 
-# Function to provide recommendations based on the user's Prime status
-def get_recommendations(user_id):
-    is_prime_member = user_data['is_prime_member']
-    # Example logic for Prime Members
-    if is_prime_member:
-        recommended_products = products_df[products_df['prime_eligible'] == True].head(5)
+browsing_recommendations = recommend_based_on_browsing(user_id)
+st.table(browsing_recommendations)
+
+# 2. Recommendations Based on Abandoned Cart
+st.header("Recommendations Based on Abandoned Cart")
+def recommend_based_on_abandoned_cart(user_id):
+    abandoned_cart_products = events_df[
+        (events_df['user_id'] == user_id) & (events_df['event_type'] == 'abandon_cart')
+    ]['product_id']
+    recommendations = products_df[products_df['asin'].isin(abandoned_cart_products)].sample(5)
+    return recommendations[['product_name', 'category', 'base_price', 'rating']]
+
+abandoned_cart_recommendations = recommend_based_on_abandoned_cart(user_id)
+st.table(abandoned_cart_recommendations)
+
+# 3. Top Rated and Discounted Products
+st.header("Top Rated and Discounted Products")
+top_rated_discounted = products_df[
+    (products_df['rating'] >= 4.5) & (products_df['discount'] > 0)
+].sort_values(by='rating', ascending=False).head(5)
+st.table(top_rated_discounted[['product_name', 'category', 'base_price', 'discount', 'rating']])
+
+# 4. User Segmentation-Based Recommendations
+st.header("User Segmentation Recommendations")
+def recommend_for_segment(user_id):
+    user_cluster = users_df.loc[users_df['user_id'] == user_id, 'cluster'].values[0]
+    if user_cluster == 0:
+        return products_df[products_df['category'] == 'Electronics'].sample(5)
     else:
-        recommended_products = products_df.sample(5)
-    
-    return recommended_products
+        return products_df[products_df['category'] == 'Fashion'].sample(5)
 
-# Get product recommendations
-recommended_products = get_recommendations(user_id)
+segmentation_recommendations = recommend_for_segment(user_id)
+st.table(segmentation_recommendations[['product_name', 'category', 'base_price', 'rating']])
 
-# Display recommendations
-st.write("**Product Recommendations:**")
-st.write(recommended_products[['product_name', 'category', 'base_price']])
+# 5. Seasonal Trends Visualization
+st.header("Seasonal Trends")
+st.markdown("Interactive visualization of purchasing trends by season.")
+seasonal_trends = events_df.groupby(['month', 'event_type']).size().unstack().fillna(0)
+st.line_chart(seasonal_trends)
 
-# Optionally, you can display the products as a table for better readability
-st.table(recommended_products[['product_name', 'category', 'base_price']])
+# 6. Filters: Price, Prime, Popularity
+st.sidebar.header("Advanced Filters")
+min_price = st.sidebar.slider("Min Price", int(products_df['base_price'].min()), int(products_df['base_price'].max()), 0)
+max_price = st.sidebar.slider("Max Price", int(products_df['base_price'].min()), int(products_df['base_price'].max()), 500)
+only_prime = st.sidebar.checkbox("Show Prime Eligible Only", value=False)
 
+st.header("Filtered Recommendations")
+def filter_and_sort_recommendations(recommendations):
+    filtered = recommendations[
+        (recommendations['base_price'] >= min_price) & (recommendations['base_price'] <= max_price)
+    ]
+    if only_prime:
+        filtered = filtered[filtered['prime_eligible'] == True]
+    return filtered.sort_values(by=['rating', 'review_count'], ascending=[False, False])
 
-# Step 3: Set up ngrok to expose the Streamlit app
-from pyngrok import ngrok
+filtered_recommendations = filter_and_sort_recommendations(products_df)
+st.table(filtered_recommendations[['product_name', 'category', 'base_price', 'rating', 'prime_eligible']].head(10))
 
-# Open a tunnel to the streamlit app
-public_url = ngrok.connect(port='8501')
-st.write('Streamlit app is live at:', public_url)
-
-# Step 4: Run the Streamlit app
-!streamlit run app.py &
-
+st.sidebar.markdown("Created by Soham Kalgutkar" | 🚀 Empowering Recommendations!")
