@@ -35,8 +35,13 @@ st.markdown(
 # 1. Recommendations Based on Browsing History
 st.header("Recommendations Based on Browsing History")
 def recommend_based_on_browsing(user_id):
-    browsed_categories = events_df[events_df['user_id'] == user_id]['category'].value_counts().head(3).index
-    recommendations = products_df[products_df['category'].isin(browsed_categories)].sample(5)
+    # Filter event type to consider only browsing (views)
+    browsed_products = events_df[
+        (events_df['user_id'] == user_id) & (events_df['event_type'] == 'view')
+    ]['product_id'].unique()
+    
+    # Get the corresponding product categories
+    recommendations = products_df[products_df['product_id'].isin(browsed_products)].sample(5)
     return recommendations[['product_name', 'category', 'base_price', 'rating']]
 
 browsing_recommendations = recommend_based_on_browsing(user_id)
@@ -48,7 +53,7 @@ def recommend_based_on_abandoned_cart(user_id):
     abandoned_cart_products = events_df[
         (events_df['user_id'] == user_id) & (events_df['event_type'] == 'abandon_cart')
     ]['product_id']
-    recommendations = products_df[products_df['asin'].isin(abandoned_cart_products)].sample(5)
+    recommendations = products_df[products_df['product_id'].isin(abandoned_cart_products)].sample(5)
     return recommendations[['product_name', 'category', 'base_price', 'rating']]
 
 abandoned_cart_recommendations = recommend_based_on_abandoned_cart(user_id)
