@@ -35,17 +35,11 @@ st.markdown(
 # 1. Recommendations Based on Browsing History
 st.header("Recommendations Based on Browsing History")
 def recommend_based_on_browsing(user_id):
-    # Get the products browsed by the user
-    browsed_products = events_df[events_df['user_id'] == user_id]['product_id'].dropna().unique()
-
-    # If no products were browsed, return an empty DataFrame or a fallback message
-    if len(browsed_products) == 0:
-        return pd.DataFrame(columns=['product_name', 'category', 'base_price', 'rating'])
-
-    # Filter products based on browsed products
-    recommendations = products_df[products_df['product_id'].isin(browsed_products)].sample(5)
-
-    return recommendations[['product_name', 'category', 'base_price', 'rating']]
+    browsed_products = events_df[events_df['user_id'] == user_id]['product_id'].value_counts().head(3).index
+    recommendations = products_df[products_df['product_id'].isin(browsed_products)]
+    sample_size = min(5, len(recommendations))
+    recommendations_sample = recommendations.sample(sample_size)
+    return recommendations_sample[['product_name', 'category', 'base_price', 'rating']]
 
 browsing_recommendations = recommend_based_on_browsing(user_id)
 st.table(browsing_recommendations)
@@ -53,11 +47,20 @@ st.table(browsing_recommendations)
 # 2. Recommendations Based on Abandoned Cart
 st.header("Recommendations Based on Abandoned Cart")
 def recommend_based_on_abandoned_cart(user_id):
-    abandoned_cart_products = events_df[ 
+    abandoned_cart_products = events_df[
         (events_df['user_id'] == user_id) & (events_df['event_type'] == 'abandon_cart')
     ]['product_id']
-    recommendations = products_df[products_df['product_id'].isin(abandoned_cart_products)].sample(5)
-    return recommendations[['product_name', 'category', 'base_price', 'rating']]
+
+    # If no abandoned cart products are found, return an empty DataFrame or a fallback message
+    if abandoned_cart_products.empty:
+        return pd.DataFrame(columns=['product_name', 'category', 'base_price', 'rating'])
+
+    # Sample up to 5 products, but handle cases where fewer than 5 are available
+    recommendations = products_df[products_df['product_id'].isin(abandoned_cart_products)]
+    sample_size = min(5, len(recommendations))
+    recommendations_sample = recommendations.sample(sample_size)
+
+    return recommendations_sample[['product_name', 'category', 'base_price', 'rating']]
 
 abandoned_cart_recommendations = recommend_based_on_abandoned_cart(user_id)
 st.table(abandoned_cart_recommendations)
@@ -95,8 +98,8 @@ only_prime = st.sidebar.checkbox("Show Prime Eligible Only", value=False)
 
 st.header("Filtered Recommendations")
 def filter_and_sort_recommendations(recommendations):
-    filtered = recommendations[
-        (recommendations['base_price'] >= min_price) & (recommendations['base_price'] <= max_price)
+    filtered = recommendations[(
+        recommendations['base_price'] >= min_price) & (recommendations['base_price'] <= max_price)
     ]
     if only_prime:
         filtered = filtered[filtered['prime_eligible'] == True]
