@@ -76,48 +76,4 @@ def recommend_based_on_categories(user_id):
 alternative_recommendations = recommend_based_on_categories(user_id)
 st.table(alternative_recommendations)
 
-# 3. Top Rated and Discounted Products (Popular Products in the Catalog)
-st.header("Top Rated and Discounted Products")
-top_rated_discounted = products_df[(
-    products_df['rating'] >= 4.5) & (products_df['discount'] > 0)
-].sort_values(by='rating', ascending=False).head(5)
-
-st.table(top_rated_discounted[['product_name', 'category', 'base_price', 'discount', 'rating']])
-
-# 4. User Segmentation-Based Recommendations
-st.header("User Segmentation Recommendations")
-def recommend_for_segment(user_id):
-    user_cluster = users_df.loc[users_df['user_id'] == user_id, 'cluster'].values[0]
-    if user_cluster == 0:
-        return products_df[products_df['category'] == 'Electronics'].sample(5)
-    else:
-        return products_df[products_df['category'] == 'Fashion'].sample(5)
-
-segmentation_recommendations = recommend_for_segment(user_id)
-st.table(segmentation_recommendations[['product_name', 'category', 'base_price', 'rating']])
-
-# 5. Seasonal Trends Visualization
-st.header("Seasonal Trends")
-st.markdown("Interactive visualization of purchasing trends by season.")
-seasonal_trends = events_df.groupby(['month', 'event_type']).size().unstack().fillna(0)
-st.line_chart(seasonal_trends)
-
-# 6. Filters: Price, Prime, Popularity
-st.sidebar.header("Advanced Filters")
-min_price = st.sidebar.slider("Min Price", int(products_df['base_price'].min()), int(products_df['base_price'].max()), 0)
-max_price = st.sidebar.slider("Max Price", int(products_df['base_price'].min()), int(products_df['base_price'].max()), 500)
-only_prime = st.sidebar.checkbox("Show Prime Eligible Only", value=False)
-
-st.header("Filtered Recommendations")
-def filter_and_sort_recommendations(recommendations):
-    filtered = recommendations[(
-        recommendations['base_price'] >= min_price) & (recommendations['base_price'] <= max_price)
-    ]
-    if only_prime:
-        filtered = filtered[filtered['prime_eligible'] == True]
-    return filtered.sort_values(by=['rating', 'review_count'], ascending=[False, False])
-
-filtered_recommendations = filter_and_sort_recommendations(products_df)
-st.table(filtered_recommendations[['product_name', 'category', 'base_price', 'rating', 'prime_eligible']].head(10))
-
 st.sidebar.markdown("Created by Soham Kalgutkar | Empowering Recommendations!")
