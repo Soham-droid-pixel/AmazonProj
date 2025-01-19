@@ -35,9 +35,17 @@ st.markdown(
 # 1. Recommendations Based on Browsing History
 st.header("Recommendations Based on Browsing History")
 def recommend_based_on_browsing(user_id):
-    browsed_products = events_df[events_df['user_id'] == user_id]['product_id'].unique()
-    recommendations = products_df[products_df['product_id'].isin(browsed_products)].sample(5)
-    return recommendations[['product_name', 'category', 'base_price', 'rating']]
+    browsed_products = events_df[events_df['user_id'] == user_id]['product_id']
+    
+    if browsed_products.empty:
+        return pd.DataFrame({"message": ["No browsing history found for this user."]})
+
+    recommendations = products_df[products_df['product_id'].isin(browsed_products)]
+    
+    if recommendations.empty:
+        return pd.DataFrame({"message": ["No matching products found in the catalog."]})
+    
+    return recommendations.sample(min(5, len(recommendations)))[['product_name', 'category', 'base_price', 'rating']]
 
 browsing_recommendations = recommend_based_on_browsing(user_id)
 st.table(browsing_recommendations)
@@ -47,20 +55,26 @@ st.header("Recommendations Based on Abandoned Cart")
 def recommend_based_on_abandoned_cart(user_id):
     abandoned_cart_products = events_df[(
         events_df['user_id'] == user_id) & (events_df['event_type'] == 'abandon_cart')]['product_id']
-    recommendations = products_df[products_df['product_id'].isin(abandoned_cart_products)].sample(5)
-    return recommendations[['product_name', 'category', 'base_price', 'rating']]
+    
+    if abandoned_cart_products.empty:
+        return pd.DataFrame({"message": ["No abandoned cart products found for this user."]})
+
+    recommendations = products_df[products_df['product_id'].isin(abandoned_cart_products)]
+    
+    if recommendations.empty:
+        return pd.DataFrame({"message": ["No matching products found in the catalog."]})
+    
+    return recommendations.sample(min(5, len(recommendations)))[['product_name', 'category', 'base_price', 'rating']]
 
 abandoned_cart_recommendations = recommend_based_on_abandoned_cart(user_id)
 st.table(abandoned_cart_recommendations)
 
-# 3. Top Rated and Discounted Products (updated to check for a 'prime_price' column)
+# 3. Top Rated and Discounted Products
 st.header("Top Rated and Discounted Products")
-# If discount is available under 'prime_price' or other similar columns, replace accordingly
 top_rated_discounted = products_df[
-    (products_df['rating'] >= 4.5) & (products_df['prime_price'] > 0)  # Assuming prime_price is used for discount indication
+    (products_df['rating'] >= 4.5) & (products_df['discount'] > 0)
 ].sort_values(by='rating', ascending=False).head(5)
-
-st.table(top_rated_discounted[['product_name', 'category', 'base_price', 'prime_price', 'rating']])
+st.table(top_rated_discounted[['product_name', 'category', 'base_price', 'discount', 'rating']])
 
 # 4. User Segmentation-Based Recommendations
 st.header("User Segmentation Recommendations")
@@ -88,8 +102,8 @@ only_prime = st.sidebar.checkbox("Show Prime Eligible Only", value=False)
 
 st.header("Filtered Recommendations")
 def filter_and_sort_recommendations(recommendations):
-    filtered = recommendations[(
-        recommendations['base_price'] >= min_price) & (recommendations['base_price'] <= max_price)
+    filtered = recommendations[
+        (recommendations['base_price'] >= min_price) & (recommendations['base_price'] <= max_price)
     ]
     if only_prime:
         filtered = filtered[filtered['prime_eligible'] == True]
