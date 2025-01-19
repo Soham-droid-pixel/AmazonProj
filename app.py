@@ -97,4 +97,4 @@ def filter_and_sort_recommendations(recommendations):
 filtered_recommendations = filter_and_sort_recommendations(products_df)
 st.table(filtered_recommendations[['product_name', 'category', 'base_price', 'rating', 'prime_eligible']].head(10))
 
-st.sidebar.markdown("Created by Soham Kalgutkar" | Empowering Recommendations!")
+st.sidebar.markdown("Created by Soham Kalgutkar | Empowering Recommendations!")
