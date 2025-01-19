@@ -57,8 +57,14 @@ Since there are no abandoned cart products for this user, we are recommending ba
 """)
 
 def recommend_based_on_categories(user_id):
-    # Get top 3 categories the user has browsed
-    browsed_categories = events_df[events_df['user_id'] == user_id]['category'].value_counts().head(3).index
+    # Get products the user has browsed
+    browsed_product_ids = events_df[events_df['user_id'] == user_id]['product_id']
+    
+    if browsed_product_ids.empty:
+        return pd.DataFrame({"message": ["No product browsed. Showing most popular products."]})
+
+    # Get categories for the browsed products
+    browsed_categories = products_df[products_df['product_id'].isin(browsed_product_ids)]['category'].value_counts().head(3).index
     
     recommendations = products_df[products_df['category'].isin(browsed_categories)]
     
